@@ -7,6 +7,7 @@
 import deepxde as dde
 import numpy as np
 import tensorflow as tf
+import pandas as pd
 
 
 # In[156]:
@@ -27,6 +28,12 @@ EI = 11.367  #Young's modulus x Moment of Inertia
 
 P = 2.893  # point load magnitude in N
 x0 = 0.7914  # location of point load from the fixed end
+
+# Load training coordinates from Excel file (first column)
+train_df = pd.read_excel(
+    "train_data_for PINN_disp_TS_v5.xlsx", skiprows=1, usecols=[0], header=None
+)
+anchors = train_df.values.astype(np.float32)
 
 
 # def q(x):
@@ -83,8 +90,9 @@ def func(x):
 # In[160]:
 
 
-# Define the 1D spatial geometry of the beam (domain from 0 to L) #replace with FEM data
-geom = dde.geometry.Interval(0, L) 
+# Define the 1D spatial geometry of the beam (domain from 0 to L)
+# Training points are provided via "anchors" loaded from the Excel file above
+geom = dde.geometry.Interval(0, L)
 
 # Boundary condition: w(0) = 0 (displacement at fixed end)
 #On the left boundary (boundary_l), enforce the condition that displacement w(x)=0.
@@ -108,12 +116,12 @@ bc4 = dde.OperatorBC(geom, lambda x, y, _: dddy(x, y), boundary_r)
 data = dde.data.PDE(   #creates the dataset for solving PDE
     geom,                   #geometry of the domain, defined earlier with geom class
     pde,                    # defined in def pde(x, y) earlier
-    [bc1, bc2, bc3, bc4],   #contributes to Ef (C in Eqn 4.6)
-    num_domain=20,          #This sets how manypde random collocation points to generate to evaluate PDE
-    num_boundary=2,         # randonly pick 2 points near x=0, and 2 points near x=L to enforce all BCs
-    ##DeepXDE internally uses slightly jittered/randomized samples to helpapply constraints more robustly amd avoid exact-precision floating point issues
-    solution=func,          #analytical soln to compare, defined above. Not for training
-    num_test=100,      #DeepXDE generates 100 test points to compare predictions with the exact solution
+    [bc1, bc2, bc3, bc4],   # contributes to Ef (C in Eqn 4.6)
+    num_domain=0,           # use only anchors from the Excel file
+    num_boundary=0,
+    anchors=anchors,        # predefined training points from file
+    solution=func,          # analytical solution for comparison
+    num_test=100,           # generate 100 test points for evaluation
 )
 
 
